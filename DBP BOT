@@ -1,0 +1,37 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+def get_data(ticker, start, end):
+    df = yf.download(ticker, start=start, end=end)
+    return df
+
+def calculate_macd(df):
+    df['EMA12'] = df['Close'].ewm(span=12, adjust=False).mean()
+    df['EMA26'] = df['Close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = df['EMA12'] - df['EMA26']
+    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    return df
+
+def generate_signals(df):
+    df['Signal_Type'] = np.where(df['MACD'] > df['Signal'], 'Buy', 'Sell')
+    df['Position'] = df['Signal_Type'].shift()
+    return df
+
+def backtest(df):
+    df['Returns'] = df['Close'].pct_change()
+    df['Strategy'] = np.where(df['Position'] == 'Buy', df['Returns'], 0)
+    df['Cumulative_Market'] = (1 + df['Returns']).cumprod()
+    df['Cumulative_Strategy'] = (1 + df['Strategy']).cumprod()
+
+    df[['Cumulative_Market', 'Cumulative_Strategy']].plot(figsize=(12,6))
+    plt.title("MACD Crossover Strategy vs Market")
+    plt.show()
+
+# Example usage
+ticker = 'AAPL'
+df = get_data(ticker, '2022-01-01', '2024-12-31')
+df = calculate_macd(df)
+df = generate_signals(df)
+backtest(df)
